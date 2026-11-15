@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Estoque - Código de Barras & Histórico</title>
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Ícones Lucide -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans">
+
+    <!-- Header -->
+    <header class="bg-blue-600 text-white p-4 shadow-md">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold flex items-center gap-2">
+                <i data-lucide="database"></i> Controle de Estoque Pro
+            </h1>
+            <span class="text-xs bg-blue-700 px-3 py-1 rounded-full font-medium">Leitor de Barras Ativo</span>
+        </div>
+    </header>
+
+    <div class="container mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- LADO ESQUERDO: Dashboard, Leitor, Cadastro e Movimentação -->
+        <div class="lg:col-span-1 space-y-6">
+            
+            <!-- Cards de Resumo -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
+                    <p class="text-gray-500 text-sm font-semibold">Total de Produtos</p>
+                    <p id="dash-total-items" class="text-2xl font-bold text-gray-800">0</p>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow border-l-4 border-green-500">
+                    <p class="text-gray-500 text-sm font-semibold">Valor Total</p>
+                    <p id="dash-total-value" class="text-2xl font-bold text-gray-800">R$ 0,00</p>
+                </div>
+            </div>
+
+            <!-- Card Alerta de Estoque Baixo -->
+            <div class="bg-white p-4 rounded-lg shadow border-l-4 border-red-500">
+                <p class="text-gray-500 text-sm font-semibold">Itens com Estoque Baixo</p>
+                <p id="dash-low-stock" class="text-2xl font-bold text-red-600">0</p>
+            </div>
+
+            <!-- LEITOR DE CÓDIGO DE BARRAS (COM BOTÃO DE SALVAR) -->
+            <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-emerald-500">
+                <h2 class="text-lg font-bold mb-3 border-b pb-2 flex items-center gap-2 text-emerald-700">
+                    <i data-lucide="scan-barcode"></i> Leitor de Código de Barras
+                </h2>
+                <p class="text-xs text-gray-500 mb-3">Escolha o modo, defina a quantidade, bipe (ou digite) o código e confirme.</p>
+                
+                <div class="grid grid-cols-2 gap-2 mb-3">
+                    <button type="button" id="mode-sub" class="py-2 px-3 rounded-md font-bold text-sm flex items-center justify-center gap-1 bg-red-600 text-white shadow-sm transition">
+                        <i data-lucide="arrow-up-right" class="w-4 h-4"></i> Modo Saída
+                    </button>
+                    <button type="button" id="mode-add" class="py-2 px-3 rounded-md font-bold text-sm flex items-center justify-center gap-1 bg-gray-200 text-gray-700 hover:bg-gray-300 transition">
+                        <i data-lucide="arrow-down-left" class="w-4 h-4"></i> Modo Entrada
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2 mb-3">
+                    <div class="col-span-1">
+                        <label class="block text-[11px] font-semibold text-gray-600 mb-1">Qtd. por Bipe</label>
+                        <input type="number" id="scanner-qty" value="1" min="1" class="w-full py-2.5 px-2 border-2 border-gray-300 rounded-md focus:ring-emerald-500 focus:border-emerald-600 font-bold text-center text-sm">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block text-[11px] font-semibold text-gray-600 mb-1">Código de Barras</label>
+                        <div class="relative">
+                            <input type="text" id="barcode-scanner-input" placeholder="Bipe ou digite..." autocomplete="off" class="w-full pl-9 pr-3 py-2.5 border-2 border-emerald-400 rounded-md focus:ring-emerald-500 focus:border-emerald-600 font-mono text-sm bg-emerald-50/30">
+                            <i data-lucide="barcode" class="absolute left-2.5 top-3 text-emerald-600 w-4 h-4"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" id="btn-scanner-save" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-md transition duration-200 flex justify-center items-center gap-2 text-sm shadow-sm">
+                    <i data-lucide="check-circle" class="w-4 h-4"></i> Salvar Movimentação
+                </button>
+
+                <div id="scanner-feedback" class="mt-2 text-xs font-semibold hidden p-2 rounded"></div>
+            </div>
+
+            <!-- Formulário de Cadastro -->
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-lg font-bold mb-4 border-b pb-2 flex items-center gap-2">
+                    <i data-lucide="plus-circle"></i> Cadastrar Novo Produto
+                </h2>
+                <form id="product-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Código de Identificação / Barras</label>
+                        <div class="relative mt-1">
+                            <input type="text" id="p-code" placeholder="Bipe ou digite o código..." required class="block w-full pl-9 rounded-md border-gray-300 border p-2 font-mono text-sm focus:ring-blue-500 focus:border-blue-500">
+                            <i data-lucide="barcode" class="absolute left-2.5 top-2.5 text-gray-400 w-4 h-4"></i>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Nome do Produto</label>
+                        <input type="text" id="p-name" required class="mt-1 block w-full rounded-md border-gray-300 border p-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+
+                    <!-- CAMPO DE FOTO/IMAGEM -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Foto do Produto (Opcional)</label>
+                        <input type="file" id="p-image" accept="image/*" class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
+                        <div id="image-preview-container" class="mt-2 hidden">
+                            <p class="text-xs text-gray-500 mb-1">Pré-visualização (Clique para expandir):</p>
+                            <img id="image-preview" src="" alt="Pré-visualização" class="w-20 h-20 object-cover rounded-md border border-gray-300 cursor-pointer hover:opacity-80 transition">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Categoria</label>
+                            <input type="text" id="p-category" placeholder="Ex: Eletrônicos" required class="mt-1 block w-full rounded-md border-gray-300 border p-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Bloco / Setor</label>
+                            <input type="text" id="p-block" placeholder="Ex: Bloco A" required class="mt-1 block w-full rounded-md border-gray-300 border p-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Qtd. Inicial</label>
+                            <input type="number" id="p-quantity" min="0" required class="mt-1 block w-full rounded-md border-gray-300 border p-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Estoque Mínimo</label>
+                            <input type="number" id="p-min-stock" min="0" value="5" required class="mt-1 block w-full rounded-md border-gray-300 border p-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Preço Unitário (R$)</label>
+                        <input type="number" id="p-price" step="0.01" min="0" required class="mt-1 block w-full rounded-md border-gray-300 border p-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <button type="submit" id="btn-save" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition duration-200 flex justify-center items-center gap-2">
+                        <i data-lucide="save"></i> Salvar no Realtime Database
+                    </button>
+                </form>
+            </div>
+
+            <!-- Movimentação em Lote -->
+            <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-indigo-500">
+                <h2 class="text-lg font-bold mb-4 border-b pb-2 flex items-center gap-2 text-indigo-700">
+                    <i data-lucide="layers"></i> Movimentação Manual em Lote
+                </h2>
+                <form id="bulk-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Selecione o Produto</label>
+                        <select id="bulk-product-select" required class="mt-1 block w-full rounded-md border-gray-300 border p-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="">Carregando produtos...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Quantidade da Operação</label>
+                        <input type="number" id="bulk-quantity" min="1" placeholder="Ex: 10" required class="mt-1 block w-full rounded-md border-gray-300 border p-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button type="button" id="btn-bulk-add" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-3 rounded-md transition duration-200 flex justify-center items-center gap-1 text-sm">
+                            <i data-lucide="plus"></i> Adicionar
+                        </button>
+                        <button type="button" id="btn-bulk-sub" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-3 rounded-md transition duration-200 flex justify-center items-center gap-1 text-sm">
+                            <i data-lucide="minus"></i> Remover
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+        </div>
+
+        <!-- LADO DIREITO: Navegação por Abas (Inventário e Histórico) -->
+        <div class="lg:col-span-2 space-y-4">
+            
+            <!-- Menu de Abas -->
+            <div class="bg-white rounded-lg shadow-md p-1.5 flex gap-2">
+                <button type="button" id="tab-btn-inventory" class="flex-1 py-2.5 px-4 rounded-md font-bold text-sm flex items-center justify-center gap-2 bg-blue-600 text-white shadow-sm transition">
+                    <i data-lucide="package" class="w-4 h-4"></i> Estoque Atual
+                </button>
+                <button type="button" id="tab-btn-history" class="flex-1 py-2.5 px-4 rounded-md font-bold text-sm flex items-center justify-center gap-2 text-gray-600 hover:bg-gray-100 transition">
+                    <i data-lucide="history" class="w-4 h-4"></i> Histórico de Movimentações
+                </button>
+            </div>
+
+            <!-- ABA 1: ESTOQUE ATUAL -->
+            <div id="tab-content-inventory" class="space-y-4">
+                <!-- Barra de Busca do Inventário -->
+                <div class="bg-white p-4 rounded-lg shadow-md flex justify-between items-center">
+                    <div class="relative w-full">
+                        <input type="text" id="search-input" placeholder="Buscar por código, produto, categoria ou bloco..." class="w-full pl-10 pr-4 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500">
+                        <i data-lucide="search" class="absolute left-3 top-2.5 text-gray-400 w-5 h-5"></i>
+                    </div>
+                </div>
+
+                <!-- Tabela de Inventário -->
+                <div class="bg-white rounded-lg shadow-md overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-50 border-b text-gray-600 text-sm leading-normal">
+                                <th class="py-3 px-4">Foto</th>
+                                <th class="py-3 px-4">Código</th>
+                                <th class="py-3 px-4">Produto</th>
+                                <th class="py-3 px-4">Categoria</th>
+                                <th class="py-3 px-4">Bloco</th>
+                                <th class="py-3 px-4 text-center">Qtd.</th>
+                                <th class="py-3 px-4">Preço Unit.</th>
+                                <th class="py-3 px-4">Total</th>
+                                <th class="py-3 px-4 text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-table-body" class="text-gray-600 text-sm font-light">
+                            <!-- Conteúdo sincronizado via Firebase -->
+                        </tbody>
+                    </table>
+                    <div id="empty-state" class="text-center py-8 text-gray-500 hidden">
+                        Nenhum produto cadastrado ou encontrado.
+                    </div>
+                </div>
+            </div>
+
+            <!-- ABA 2: HISTÓRICO DE MOVIMENTAÇÕES -->
+            <div id="tab-content-history" class="hidden space-y-4">
+                <!-- Barra de Busca do Histórico -->
+                <div class="bg-white p-4 rounded-lg shadow-md flex flex-col sm:flex-row gap-3 justify-between items-center">
+                    <div class="relative w-full">
+                        <input type="text" id="history-search-input" placeholder="Filtrar histórico por código, produto ou operação (ENTRADA, SAÍDA)..." class="w-full pl-10 pr-4 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500">
+                        <i data-lucide="search" class="absolute left-3 top-2.5 text-gray-400 w-5 h-5"></i>
+                    </div>
+                    <span class="text-xs text-gray-500 whitespace-nowrap font-medium">Últimas 100 operações</span>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-50 border-b text-gray-600 text-xs uppercase">
+                                <th class="py-3 px-4">Data / Hora</th>
+                                <th class="py-3 px-4">Código</th>
+                                <th class="py-3 px-4">Produto</th>
+                                <th class="py-3 px-4">Operação</th>
+                                <th class="py-3 px-4 text-center">Qtd. Movimentada</th>
+                                <th class="py-3 px-4 text-center">Saldo Final</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body" class="text-gray-600 text-sm divide-y divide-gray-100">
+                            <!-- Histórico sincronizado via Firebase -->
+                        </tbody>
+                    </table>
+                    <div id="empty-history" class="text-center py-8 text-gray-400 text-sm hidden">
+                        Nenhuma movimentação registrada ou encontrada.
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- MODAL DE VISUALIZAÇÃO DE IMAGEM -->
+    <div id="image-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="relative max-w-3xl w-full bg-white rounded-lg overflow-hidden shadow-2xl flex flex-col items-center p-4">
+            <button id="close-modal" class="absolute top-2 right-2 text-gray-500 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 rounded-full p-2 transition">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+            <h3 id="modal-title" class="text-lg font-bold text-gray-800 mb-3 text-center"></h3>
+            <div class="max-h-[75vh] overflow-auto flex items-center justify-center w-full">
+                <img id="modal-image" src="" alt="Foto do Produto" class="max-w-full max-h-[70vh] object-contain rounded-md shadow-sm">
+            </div>
+        </div>
+    </div>
+
+    <!-- SDK Firebase Realtime Database (Versão Modular) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { 
+            getDatabase, 
+            ref, 
+            push, 
+            onValue, 
+            remove, 
+            update,
+            query,
+            limitToLast
+        } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        // CONFIGURAÇÃO DO FIREBASE REALTIME DATABASE
+        const firebaseConfig = {
+            databaseURL: "https://controle-de-estoque-22f06-default-rtdb.firebaseio.com/"
+        };
+
+        // Inicializa o app e o Realtime Database
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const inventoryRef = ref(db, 'inventory');
+        const movementsRef = ref(db, 'movements');
+
+        // Variáveis de Estado
+        let inventory = [];
+        let allMovements = [];
+        let currentBase64Image = "";
+        let scannerMode = 'subtract'; // 'subtract' (saída) ou 'add' (entrada)
+
+        // Elementos DOM - Abas
+        const tabBtnInventory = document.getElementById('tab-btn-inventory');
+        const tabBtnHistory = document.getElementById('tab-btn-history');
+        const tabContentInventory = document.getElementById('tab-content-inventory');
+        const tabContentHistory = document.getElementById('tab-content-history');
+
+        // Elementos DOM - Geral
+        const form = document.getElementById('product-form');
+        const pCodeInput = document.getElementById('p-code');
+        const imageInput = document.getElementById('p-image');
+        const imagePreviewContainer = document.getElementById('image-preview-container');
+        const imagePreview = document.getElementById('image-preview');
+        const tableBody = document.getElementById('inventory-table-body');
+        const historyTableBody = document.getElementById('history-table-body');
+        const searchInput = document.getElementById('search-input');
+        const historySearchInput = document.getElementById('history-search-input');
+        const emptyState = document.getElementById('empty-state');
+        const emptyHistory = document.getElementById('empty-history');
+        const bulkSelect = document.getElementById('bulk-product-select');
+
+        // Elementos do Leitor de Código de Barras
+        const scannerInput = document.getElementById('barcode-scanner-input');
+        const scannerQtyInput = document.getElementById('scanner-qty');
+        const btnScannerSave = document.getElementById('btn-scanner-save');
+        const scannerFeedback = document.getElementById('scanner-feedback');
+        const btnModeSub = document.getElementById('mode-sub');
+        const btnModeAdd = document.getElementById('mode-add');
+
+        // Elementos do Modal
+        const imageModal = document.getElementById('image-modal');
+        const modalImage = document.getElementById('modal-image');
+        const modalTitle = document.getElementById('modal-title');
+        const closeModalBtn = document.getElementById('close-modal');
+
+        lucide.createIcons();
+
+        // Alternância entre Abas
+        function switchTab(tab) {
+            if (tab === 'inventory') {
+                tabContentInventory.classList.remove('hidden');
+                tabContentHistory.classList.add('hidden');
+                tabBtnInventory.className = "flex-1 py-2.5 px-4 rounded-md font-bold text-sm flex items-center justify-center gap-2 bg-blue-600 text-white shadow-sm transition";
+                tabBtnHistory.className = "flex-1 py-2.5 px-4 rounded-md font-bold text-sm flex items-center justify-center gap-2 text-gray-600 hover:bg-gray-100 transition";
+            } else {
+                tabContentInventory.classList.add('hidden');
+                tabContentHistory.classList.remove('hidden');
+                tabBtnHistory.className = "flex-1 py-2.5 px-4 rounded-md font-bold text-sm flex items-center justify-center gap-2 bg-blue-600 text-white shadow-sm transition";
+                tabBtnInventory.className = "flex-1 py-2.5 px-4 rounded-md font-bold text-sm flex items-center justify-center gap-2 text-gray-600 hover:bg-gray-100 transition";
+            }
+        }
+
+        tabBtnInventory.addEventListener('click', () => switchTab('inventory'));
+        tabBtnHistory.addEventListener('click', () => switchTab('history'));
+
+        // Formatação Monetária
+        function formatMoney(value) {
+            return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+        }
+
+        // Formatação de Data e Hora
+        function formatDateTime(isoString) {
+            const date = new Date(isoString);
+            return date.toLocaleString('pt-BR', {
+                day: '2-digit', month: '2-digit', year: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+        }
+
+        // Registrar Movimentação no Histórico
+        async function logMovement(code, productName, type, qtyChanged, finalBalance) {
+            try {
+                await push(movementsRef, {
+                    code: code || 'S/C',
+                    productName: productName,
+                    type: type, // 'CADASTRO', 'ENTRADA', 'SAÍDA', 'EXCLUSÃO'
+                    quantity: qtyChanged,
+                    finalBalance: finalBalance,
+                    timestamp: new Date().toISOString()
+                });
+            } catch (error) {
+                console.error("Erro ao salvar histórico:", error);
+            }
+        }
+
+        // Alternar Modo do Leitor (Entrada vs Saída)
+        btnModeSub.addEventListener('click', () => {
+            scannerMode = 'subtract';
+            btnModeSub.className = "py-2 px-3 rounded-md font-bold text-sm flex items-center justify-center gap-1 bg-red-600 text-white shadow-sm transition";
+            btnModeAdd.className = "py-2 px-3 rounded-md font-bold text-sm flex items-center justify-center gap-1 bg-gray-200 text-gray-700 hover:bg-gray-300 transition";
+            scannerInput.focus();
+        });
+
+        btnModeAdd.addEventListener('click', () => {
+            scannerMode = 'add';
+            btnModeAdd.className = "py-2 px-3 rounded-md font-bold text-sm flex items-center justify-center gap-1 bg-green-600 text-white shadow-sm transition";
+            btnModeSub.className = "py-2 px-3 rounded-md font-bold text-sm flex items-center justify-center gap-1 bg-gray-200 text-gray-700 hover:bg-gray-300 transition";
+            scannerInput.focus();
+        });
+
+        // Exibir Feedback Visual do Leitor
+        function showScannerFeedback(message, isSuccess) {
+            scannerFeedback.textContent = message;
+            scannerFeedback.className = `mt-2 text-xs font-semibold p-2 rounded block ${
+                isSuccess ? 'bg-green-100 text-green-800 border border-green-300' : 'bg-red-100 text-red-800 border border-red-300'
+            }`;
+            setTimeout(() => {
+                scannerFeedback.classList.add('hidden');
+            }, 4500);
+        }
+
+        // Função Unificada para Processar Leitura do Código de Barras (Enter ou Botão Salvar)
+        async function processBarcodeScan() {
+            const scannedCode = scannerInput.value.trim();
+            const qtyToMove = parseInt(scannerQtyInput.value) || 1;
+
+            if (!scannedCode) {
+                showScannerFeedback("Bipe ou digite um código de barras primeiro.", false);
+                scannerInput.focus();
+                return;
+            }
+
+            if (qtyToMove <= 0) {
+                showScannerFeedback("A quantidade por bipe deve ser maior que zero!", false);
+                scannerQtyInput.value = 1;
+                scannerQtyInput.focus();
+                return;
+            }
+
+            const product = inventory.find(item => item.code && item.code.toLowerCase() === scannedCode.toLowerCase());
+
+            if (!product) {
+                showScannerFeedback(`Código "${scannedCode}" não encontrado no estoque!`, false);
+                scannerInput.value = '';
+                scannerInput.focus();
+                return;
+            }
+
+            try {
+                if (scannerMode === 'subtract') {
+                    if (product.quantity < qtyToMove) {
+                        showScannerFeedback(`Estoque insuficiente para "${product.name}"! Solicitado: ${qtyToMove} | Disponível: ${product.quantity}`, false);
+                        scannerInput.focus();
+                        return;
+                    }
+                    const newQty = product.quantity - qtyToMove;
+                    await update(ref(db, `inventory/${product.id}`), { quantity: newQty });
+                    await logMovement(product.code, product.name, 'SAÍDA', qtyToMove, newQty);
+                    showScannerFeedback(`Saída (-${qtyToMove}): ${product.name} | Saldo atual: ${newQty}`, true);
+                } else {
+                    const newQty = product.quantity + qtyToMove;
+                    await update(ref(db, `inventory/${product.id}`), { quantity: newQty });
+                    await logMovement(product.code, product.name, 'ENTRADA', qtyToMove, newQty);
+                    showScannerFeedback(`Entrada (+${qtyToMove}): ${product.name} | Saldo atual: ${newQty}`, true);
+                }
+
+                scannerInput.value = ''; // Limpa o código após salvar com sucesso
+                scannerInput.focus();    // Mantém o foco para a próxima leitura
+            } catch (error) {
+                showScannerFeedback("Erro ao salvar movimentação: " + error.message, false);
+            }
+        }
+
+        // Evento ao pressionar Enter no campo do leitor
+        scannerInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                processBarcodeScan();
+            }
+        });
+
+        // Evento ao clicar no botão Salvar do leitor
+        btnScannerSave.addEventListener('click', () => {
+            processBarcodeScan();
+        });
+
+        // Se o usuário digitar a quantidade e apertar Enter, move o foco direto para o leitor
+        scannerQtyInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                scannerInput.focus();
+            }
+        });
+
+        // Impede que o leitor envie o formulário de cadastro ao bipar o código
+        pCodeInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('p-name').focus();
+            }
+        });
+
+        // Função para Abrir Modal da Imagem
+        window.openImageModal = (src, title = "Visualização da Imagem") => {
+            if (!src) return;
+            modalImage.src = src;
+            modalTitle.textContent = title;
+            imageModal.classList.remove('hidden');
+        };
+
+        // Fechar Modal
+        closeModalBtn.addEventListener('click', () => imageModal.classList.add('hidden'));
+        imageModal.addEventListener('click', (e) => {
+            if (e.target === imageModal) imageModal.classList.add('hidden');
+        });
+
+        // Pré-visualização e conversão da imagem para Base64
+        imageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const img = new Image();
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        const MAX_WIDTH = 400;
+                        const MAX_HEIGHT = 400;
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > height) {
+                            if (width > MAX_WIDTH) {
+                                height *= MAX_WIDTH / width;
+                                width = MAX_WIDTH;
+                            }
+                        } else {
+                            if (height > MAX_HEIGHT) {
+                                width *= MAX_HEIGHT / height;
+                                height = MAX_HEIGHT;
+                            }
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        currentBase64Image = canvas.toDataURL('image/jpeg', 0.8);
+                        imagePreview.src = currentBase64Image;
+                        imagePreviewContainer.classList.remove('hidden');
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            } else {
+                currentBase64Image = "";
+                imagePreviewContainer.classList.add('hidden');
+            }
+        });
+
+        imagePreview.addEventListener('click', () => {
+            if (currentBase64Image) openImageModal(currentBase64Image, "Pré-visualização do Novo Produto");
+        });
+
+        // Listener em Tempo Real do Inventário
+        onValue(inventoryRef, (snapshot) => {
+            const data = snapshot.val();
+            inventory = [];
+            
+            if (data) {
+                Object.keys(data).forEach(key => {
+                    inventory.push({
+                        id: key,
+                        ...data[key]
+                    });
+                });
+            }
+
+            updateDashboard();
+            renderTable();
+            populateSelectOptions();
+        });
+
+        // Listener em Tempo Real do Histórico de Movimentações
+        const recentMovementsQuery = query(movementsRef, limitToLast(100));
+        onValue(recentMovementsQuery, (snapshot) => {
+            const data = snapshot.val();
+            allMovements = [];
+
+            if (data) {
+                Object.keys(data).forEach(key => {
+                    allMovements.push({ id: key, ...data[key] });
+                });
+            }
+
+            // Ordenar do mais recente para o mais antigo
+            allMovements.reverse();
+            renderHistory();
+        });
+
+        // Renderizar Tabela de Histórico (com suporte a busca)
+        function renderHistory() {
+            const queryText = historySearchInput.value.toLowerCase();
+            const filteredMovements = allMovements.filter(mov =>
+                (mov.code && mov.code.toLowerCase().includes(queryText)) ||
+                (mov.productName && mov.productName.toLowerCase().includes(queryText)) ||
+                (mov.type && mov.type.toLowerCase().includes(queryText))
+            );
+
+            historyTableBody.innerHTML = '';
+
+            if (filteredMovements.length === 0) {
+                emptyHistory.classList.remove('hidden');
+                return;
+            }
+            emptyHistory.classList.add('hidden');
+
+            filteredMovements.forEach(mov => {
+                let badgeClass = 'bg-gray-100 text-gray-700';
+                let sign = '';
+
+                if (mov.type === 'ENTRADA') {
+                    badgeClass = 'bg-green-100 text-green-700 border border-green-200';
+                    sign = '+';
+                } else if (mov.type === 'SAÍDA') {
+                    badgeClass = 'bg-red-100 text-red-700 border border-red-200';
+                    sign = '-';
+                } else if (mov.type === 'CADASTRO') {
+                    badgeClass = 'bg-blue-100 text-blue-700 border border-blue-200';
+                    sign = '+';
+                } else if (mov.type === 'EXCLUSÃO') {
+                    badgeClass = 'bg-orange-100 text-orange-700 border border-orange-200';
+                }
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50 transition";
+                tr.innerHTML = `
+                    <td class="py-3 px-4 text-xs text-gray-500 whitespace-nowrap">${formatDateTime(mov.timestamp)}</td>
+                    <td class="py-3 px-4 font-mono text-xs text-gray-700">${mov.code}</td>
+                    <td class="py-3 px-4 font-medium text-gray-800">${mov.productName}</td>
+                    <td class="py-3 px-4">
+                        <span class="text-xs font-bold px-2.5 py-0.5 rounded-full ${badgeClass}">${mov.type}</span>
+                    </td>
+                    <td class="py-3 px-4 text-center font-bold">${sign}${mov.quantity}</td>
+                    <td class="py-3 px-4 text-center text-gray-600 font-semibold">${mov.finalBalance}</td>
+                `;
+                historyTableBody.appendChild(tr);
+            });
+        }
+
+        // Atualização de Indicadores
+        function updateDashboard() {
+            const totalItems = inventory.length;
+            const totalValue = inventory.reduce((acc, item) => acc + (item.quantity * item.price), 0);
+            const lowStockItems = inventory.filter(item => item.quantity <= item.minStock).length;
+
+            document.getElementById('dash-total-items').textContent = totalItems;
+            document.getElementById('dash-total-value').textContent = formatMoney(totalValue);
+            document.getElementById('dash-low-stock').textContent = lowStockItems;
+        }
+
+        // Atualização do Select
+        function populateSelectOptions() {
+            bulkSelect.innerHTML = '<option value="">Selecione um produto...</option>';
+            inventory.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.id;
+                option.textContent = `[${item.code || 'S/C'}] ${item.name} (${item.block}) - Qtd: ${item.quantity}`;
+                bulkSelect.appendChild(option);
+            });
+        }
+
+        // Salvar Novo Produto
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const codeValue = pCodeInput.value.trim();
+
+            // Verifica se já existe um produto com o mesmo código
+            const duplicate = inventory.find(item => item.code && item.code.toLowerCase() === codeValue.toLowerCase());
+            if (duplicate) {
+                return alert(`Já existe um produto cadastrado com o código "${codeValue}" (${duplicate.name}).`);
+            }
+
+            const initialQty = parseInt(document.getElementById('p-quantity').value);
+            const productName = document.getElementById('p-name').value.trim();
+
+            const newProduct = {
+                code: codeValue,
+                name: productName,
+                imageUrl: currentBase64Image || "",
+                category: document.getElementById('p-category').value.trim(),
+                block: document.getElementById('p-block').value.trim(),
+                quantity: initialQty,
+                minStock: parseInt(document.getElementById('p-min-stock').value),
+                price: parseFloat(document.getElementById('p-price').value),
+                createdAt: new Date().toISOString()
+            };
+
+            try {
+                await push(inventoryRef, newProduct);
+                await logMovement(codeValue, productName, 'CADASTRO', initialQty, initialQty);
+                
+                form.reset();
+                currentBase64Image = "";
+                imagePreviewContainer.classList.add('hidden');
+            } catch (error) {
+                alert("Erro ao gravar dados no Firebase: " + error.message);
+            }
+        });
+
+        // Movimentação Manual em Lote
+        async function executeBulkMovement(action) {
+            const productId = bulkSelect.value;
+            const qtyInput = document.getElementById('bulk-quantity');
+            const qtyChange = parseInt(qtyInput.value);
+
+            if (!productId) return alert("Selecione um produto.");
+            if (!qtyChange || qtyChange <= 0) return alert("Digite uma quantidade válida.");
+
+            const product = inventory.find(item => item.id === productId);
+
+            if (product) {
+                let newQty = product.quantity;
+
+                if (action === 'add') {
+                    newQty += qtyChange;
+                } else {
+                    if (product.quantity < qtyChange) {
+                        return alert(`Estoque insuficiente. Saldo atual: ${product.quantity}`);
+                    }
+                    newQty -= qtyChange;
+                }
+
+                try {
+                    const itemRef = ref(db, `inventory/${productId}`);
+                    await update(itemRef, { quantity: newQty });
+                    await logMovement(
+                        product.code, 
+                        product.name, 
+                        action === 'add' ? 'ENTRADA' : 'SAÍDA', 
+                        qtyChange, 
+                        newQty
+                    );
+                    qtyInput.value = '';
+                } catch (error) {
+                    alert("Erro ao atualizar o estoque: " + error.message);
+                }
+            }
+        }
+
+        // Excluir Registro
+        window.deleteProduct = async (id) => {
+            const product = inventory.find(item => item.id === id);
+            if (!product) return;
+
+            if (confirm(`Tem certeza que deseja apagar permanentemente "${product.name}" do Firebase?`)) {
+                try {
+                    const itemRef = ref(db, `inventory/${id}`);
+                    await remove(itemRef);
+                    await logMovement(product.code, product.name, 'EXCLUSÃO', product.quantity, 0);
+                } catch (error) {
+                    alert("Erro ao excluir: " + error.message);
+                }
+            }
+        };
+
+        // Renderização da Tabela
+        function renderTable() {
+            const queryText = searchInput.value.toLowerCase();
+            const filteredInventory = inventory.filter(item => 
+                (item.code && item.code.toLowerCase().includes(queryText)) ||
+                (item.name && item.name.toLowerCase().includes(queryText)) || 
+                (item.category && item.category.toLowerCase().includes(queryText)) || 
+                (item.block && item.block.toLowerCase().includes(queryText))
+            );
+
+            tableBody.innerHTML = '';
+
+            if (filteredInventory.length === 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            filteredInventory.forEach(item => {
+                const isLowStock = item.quantity <= item.minStock;
+                const row = document.createElement('tr');
+                row.className = "border-b border-gray-200 hover:bg-gray-50 transition";
+
+                const imageHtml = item.imageUrl 
+                    ? `<img src="${item.imageUrl}" alt="${item.name}" onclick="openImageModal('${item.imageUrl}', '${item.name.replace(/'/g, "\\'")}')" class="w-12 h-12 object-cover rounded-md border border-gray-200 cursor-pointer hover:scale-105 hover:opacity-80 transition transform">`
+                    : `<div class="w-12 h-12 bg-gray-100 rounded-md border border-gray-200 flex items-center justify-center text-gray-400"><i data-lucide="image" class="w-6 h-6"></i></div>`;
+
+                row.innerHTML = `
+                    <td class="py-3 px-4">${imageHtml}</td>
+                    <td class="py-3 px-4 font-mono text-xs font-semibold text-gray-700">${item.code || '-'}</td>
+                    <td class="py-3 px-4 font-medium text-gray-800">
+                        ${item.name}
+                        ${isLowStock ? '<span class="ml-2 text-xs bg-red-100 text-red-600 font-bold px-2 py-0.5 rounded-full">Baixo</span>' : ''}
+                    </td>
+                    <td class="py-3 px-4">${item.category}</td>
+                    <td class="py-3 px-4">
+                        <span class="bg-gray-100 text-gray-700 text-xs font-semibold px-2.5 py-1 rounded border border-gray-300">
+                            ${item.block}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4 text-center font-bold ${isLowStock ? 'text-red-600' : 'text-gray-700'}">
+                        ${item.quantity}
+                    </td>
+                    <td class="py-3 px-4">${formatMoney(item.price)}</td>
+                    <td class="py-3 px-4 font-semibold text-gray-800">${formatMoney(item.quantity * item.price)}</td>
+                    <td class="py-3 px-4 text-center">
+                        <button onclick="deleteProduct('${item.id}')" title="Apagar Registro" class="text-red-500 hover:text-red-700 p-1">
+                            <i data-lucide="trash-2" class="w-5 h-5"></i>
+                        </button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+
+            lucide.createIcons();
+        }
+
+        // Binds de eventos
+        document.getElementById('btn-bulk-add').addEventListener('click', () => executeBulkMovement('add'));
+        document.getElementById('btn-bulk-sub').addEventListener('click', () => executeBulkMovement('subtract'));
+        searchInput.addEventListener('input', renderTable);
+        historySearchInput.addEventListener('input', renderHistory);
+    </script>
+</body>
+</html>

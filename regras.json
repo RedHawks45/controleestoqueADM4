@@ -1,0 +1,13 @@
+{
+  "rules": {
+    "inventory": {
+      ".read": true,
+      ".write": true
+    },
+    "movements": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["timestamp"]
+    }
+  }
+}
