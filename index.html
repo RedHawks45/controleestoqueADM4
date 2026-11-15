@@ -220,13 +220,18 @@
 
             <!-- ABA 2: HISTÓRICO DE MOVIMENTAÇÕES -->
             <div id="tab-content-history" class="hidden space-y-4">
-                <!-- Barra de Busca do Histórico -->
+                <!-- Barra de Busca e Limpeza do Histórico -->
                 <div class="bg-white p-4 rounded-lg shadow-md flex flex-col sm:flex-row gap-3 justify-between items-center">
                     <div class="relative w-full">
                         <input type="text" id="history-search-input" placeholder="Filtrar histórico por código, produto ou operação (ENTRADA, SAÍDA)..." class="w-full pl-10 pr-4 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500">
                         <i data-lucide="search" class="absolute left-3 top-2.5 text-gray-400 w-5 h-5"></i>
                     </div>
-                    <span class="text-xs text-gray-500 whitespace-nowrap font-medium">Últimas 100 operações</span>
+                    <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+                        <span class="text-xs text-gray-500 whitespace-nowrap font-medium">Últimas 100 operações</span>
+                        <button type="button" id="btn-open-clean-history" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-semibold py-2 px-3 rounded-md text-xs flex items-center gap-1.5 transition whitespace-nowrap">
+                            <i data-lucide="eraser" class="w-4 h-4"></i> Limpar Histórico
+                        </button>
+                    </div>
                 </div>
 
                 <div class="bg-white rounded-lg shadow-md overflow-x-auto">
@@ -264,6 +269,60 @@
             <h3 id="modal-title" class="text-lg font-bold text-gray-800 mb-3 text-center"></h3>
             <div class="max-h-[75vh] overflow-auto flex items-center justify-center w-full">
                 <img id="modal-image" src="" alt="Foto do Produto" class="max-w-full max-h-[70vh] object-contain rounded-md shadow-sm">
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE LIMPEZA DE HISTÓRICO -->
+    <div id="clean-history-modal" class="fixed inset-0 bg-black/70 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-lg max-w-md w-full p-6 shadow-2xl relative">
+            <button id="close-clean-modal" class="absolute top-3 right-3 text-gray-400 hover:text-gray-700 p-1 rounded-full transition">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            
+            <div class="flex items-center gap-3 mb-4 text-red-600">
+                <div class="bg-red-100 p-2.5 rounded-full">
+                    <i data-lucide="eraser" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800">Modo de Limpeza do Histórico</h3>
+                    <p class="text-xs text-gray-500">Esta ação remove os registros permanentemente.</p>
+                </div>
+            </div>
+
+            <div class="space-y-3 my-5">
+                <!-- Opção 1: Limpar apenas filtrados -->
+                <button type="button" id="btn-clean-filtered" class="w-full text-left p-3.5 rounded-lg border border-gray-200 hover:border-amber-400 hover:bg-amber-50/50 transition flex items-start gap-3 group">
+                    <i data-lucide="filter-x" class="w-5 h-5 text-amber-600 mt-0.5 shrink-0"></i>
+                    <div>
+                        <p class="font-bold text-sm text-gray-800 group-hover:text-amber-700">Limpar registros filtrados</p>
+                        <p id="clean-filtered-desc" class="text-xs text-gray-500 mt-0.5">Apaga apenas os itens atualmente visíveis na tabela.</p>
+                    </div>
+                </button>
+
+                <!-- Opção 2: Manter apenas os últimos 20 -->
+                <button type="button" id="btn-clean-old" class="w-full text-left p-3.5 rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50/50 transition flex items-start gap-3 group">
+                    <i data-lucide="clock-rewind" class="w-5 h-5 text-blue-600 mt-0.5 shrink-0"></i>
+                    <div>
+                        <p class="font-bold text-sm text-gray-800 group-hover:text-blue-700">Manter apenas os últimos 20</p>
+                        <p class="text-xs text-gray-500 mt-0.5">Apaga os registros mais antigos e preserva o histórico recente.</p>
+                    </div>
+                </button>
+
+                <!-- Opção 3: Apagar tudo -->
+                <button type="button" id="btn-clean-all" class="w-full text-left p-3.5 rounded-lg border border-red-200 bg-red-50/30 hover:border-red-500 hover:bg-red-50 transition flex items-start gap-3 group">
+                    <i data-lucide="trash-2" class="w-5 h-5 text-red-600 mt-0.5 shrink-0"></i>
+                    <div>
+                        <p class="font-bold text-sm text-red-700">Limpar TODO o histórico</p>
+                        <p class="text-xs text-red-500 mt-0.5">Zera completamente todas as movimentações registradas no banco.</p>
+                    </div>
+                </button>
+            </div>
+
+            <div class="flex justify-end">
+                <button type="button" id="cancel-clean-modal" class="px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-md transition">
+                    Cancelar
+                </button>
             </div>
         </div>
     </div>
@@ -327,11 +386,21 @@
         const btnModeSub = document.getElementById('mode-sub');
         const btnModeAdd = document.getElementById('mode-add');
 
-        // Elementos do Modal
+        // Elementos do Modal de Imagem
         const imageModal = document.getElementById('image-modal');
         const modalImage = document.getElementById('modal-image');
         const modalTitle = document.getElementById('modal-title');
         const closeModalBtn = document.getElementById('close-modal');
+
+        // Elementos do Modal de Limpeza do Histórico
+        const cleanHistoryModal = document.getElementById('clean-history-modal');
+        const btnOpenCleanHistory = document.getElementById('btn-open-clean-history');
+        const closeCleanModalBtn = document.getElementById('close-clean-modal');
+        const cancelCleanModalBtn = document.getElementById('cancel-clean-modal');
+        const btnCleanFiltered = document.getElementById('btn-clean-filtered');
+        const cleanFilteredDesc = document.getElementById('clean-filtered-desc');
+        const btnCleanOld = document.getElementById('btn-clean-old');
+        const btnCleanAll = document.getElementById('btn-clean-all');
 
         lucide.createIcons();
 
@@ -498,7 +567,7 @@
             imageModal.classList.remove('hidden');
         };
 
-        // Fechar Modal
+        // Fechar Modal de Imagem
         closeModalBtn.addEventListener('click', () => imageModal.classList.add('hidden'));
         imageModal.addEventListener('click', (e) => {
             if (e.target === imageModal) imageModal.classList.add('hidden');
@@ -588,14 +657,19 @@
             renderHistory();
         });
 
-        // Renderizar Tabela de Histórico (com suporte a busca)
-        function renderHistory() {
+        // Helper para obter os movimentos filtrados pela barra de busca
+        function getFilteredMovements() {
             const queryText = historySearchInput.value.toLowerCase();
-            const filteredMovements = allMovements.filter(mov =>
+            return allMovements.filter(mov =>
                 (mov.code && mov.code.toLowerCase().includes(queryText)) ||
                 (mov.productName && mov.productName.toLowerCase().includes(queryText)) ||
                 (mov.type && mov.type.toLowerCase().includes(queryText))
             );
+        }
+
+        // Renderizar Tabela de Histórico (com suporte a busca)
+        function renderHistory() {
+            const filteredMovements = getFilteredMovements();
 
             historyTableBody.innerHTML = '';
 
@@ -637,6 +711,96 @@
                 historyTableBody.appendChild(tr);
             });
         }
+
+        // ==========================================
+        // MODO DE LIMPEZA DO HISTÓRICO
+        // ==========================================
+        btnOpenCleanHistory.addEventListener('click', () => {
+            if (allMovements.length === 0) {
+                alert("O histórico já está vazio.");
+                return;
+            }
+
+            const filteredCount = getFilteredMovements().length;
+            const hasFilter = historySearchInput.value.trim() !== "";
+
+            if (hasFilter) {
+                cleanFilteredDesc.textContent = `Apaga os ${filteredCount} registro(s) que correspondem ao filtro "${historySearchInput.value}".`;
+                btnCleanFiltered.disabled = filteredCount === 0;
+                btnCleanFiltered.classList.toggle('opacity-50', filteredCount === 0);
+            } else {
+                cleanFilteredDesc.textContent = "Digite algo na barra de filtro do histórico para usar esta opção.";
+                btnCleanFiltered.disabled = true;
+                btnCleanFiltered.classList.add('opacity-50');
+            }
+
+            cleanHistoryModal.classList.remove('hidden');
+        });
+
+        function closeCleanModal() {
+            cleanHistoryModal.classList.add('hidden');
+        }
+
+        closeCleanModalBtn.addEventListener('click', closeCleanModal);
+        cancelCleanModalBtn.addEventListener('click', closeCleanModal);
+        cleanHistoryModal.addEventListener('click', (e) => {
+            if (e.target === cleanHistoryModal) closeCleanModal();
+        });
+
+        // 1. Limpar apenas os filtrados
+        btnCleanFiltered.addEventListener('click', async () => {
+            const toDelete = getFilteredMovements();
+            if (toDelete.length === 0) return;
+
+            if (confirm(`Deseja apagar permanentemente os ${toDelete.length} registro(s) filtrados?`)) {
+                try {
+                    const updates = {};
+                    toDelete.forEach(mov => {
+                        updates[`movements/${mov.id}`] = null;
+                    });
+                    await update(ref(db), updates);
+                    historySearchInput.value = '';
+                    closeCleanModal();
+                } catch (error) {
+                    alert("Erro ao limpar registros filtrados: " + error.message);
+                }
+            }
+        });
+
+        // 2. Manter apenas os últimos 20
+        btnCleanOld.addEventListener('click', async () => {
+            if (allMovements.length <= 20) {
+                alert(`Você possui apenas ${allMovements.length} registro(s). Nenhum registro antigo para remover.`);
+                return;
+            }
+
+            const toDelete = allMovements.slice(20); // allMovements já está ordenado do mais novo para o mais antigo
+            if (confirm(`Isso manterá as 20 movimentações mais recentes e apagará ${toDelete.length} registro(s) antigos. Continuar?`)) {
+                try {
+                    const updates = {};
+                    toDelete.forEach(mov => {
+                        updates[`movements/${mov.id}`] = null;
+                    });
+                    await update(ref(db), updates);
+                    closeCleanModal();
+                } catch (error) {
+                    alert("Erro ao limpar registros antigos: " + error.message);
+                }
+            }
+        });
+
+        // 3. Limpar TODO o histórico
+        btnCleanAll.addEventListener('click', async () => {
+            if (confirm("ATENÇÃO: Tem certeza que deseja apagar TODO o histórico de movimentações? Esta ação não pode ser desfeita.")) {
+                try {
+                    await remove(movementsRef);
+                    historySearchInput.value = '';
+                    closeCleanModal();
+                } catch (error) {
+                    alert("Erro ao limpar o histórico: " + error.message);
+                }
+            }
+        });
 
         // Atualização de Indicadores
         function updateDashboard() {
